@@ -17,13 +17,14 @@ const int MAX_INPUT_PER_LAYER = 1048576;
 const int MAX_NUM_CHOUT = 512;
 const int MAX_DIMENSION = 256;
 const int MAX_CHANNELS = 736;
+const int MAX_PAD_SIZE = 2;
 
 const int TOTAL_NUM_WEIGHTS = 2528800;
 const int TOTAL_NUM_INPUTS = 3661824;
 const int TOTAL_NUM_OUTPUTS = 3239936;
 const int TOTAL_DRAM_IO = 9430560;
 
-const int DRAM_DEPTH = 5932576;
+const int DRAM_DEPTH = 1440;
 const float TEST_RESULT_EXPECTED = 88.38;
 
 // Mean Pixel for ImageNet Data

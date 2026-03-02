@@ -195,7 +195,7 @@ L_Y:
 // =============================
 // For Debugging: Write DATA Region and WEIGHT Region to files...
 #ifndef __SYNTHESIS__
-#if 1
+#if 0
   int nbytes;
   FILE *outfile;
 
@@ -244,7 +244,7 @@ L_Y:
 // ===========
 // = LOGGING =
 // ===========
-bool LOG_DETAILS = false;
+bool LOG_DETAILS = true;
 int LOG_LEVEL = 0;
 void print_indent(int lvl) {
   while (lvl--) {

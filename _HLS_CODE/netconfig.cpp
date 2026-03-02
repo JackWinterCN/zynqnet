@@ -40,11 +40,13 @@ void addLayer(network_t *net, layer_t layer) {
   // Data Size Calculations
   int input_data_pixels = layer.width * layer.height * layer.channels_in;
   int width_out =
-      1 + std::floor((float)(layer.width + 2 * layer.pad - layer.kernel) /
+      1 + std::floor((float)(layer.width + 2 * layer.pad_size - layer.kernel) /
                      layer.stride);
   int height_out =
-      1 + std::floor((float)(layer.height + 2 * layer.pad - layer.kernel) /
+      1 + std::floor((float)(layer.height + 2 * layer.pad_size - layer.kernel) /
                      layer.stride);
+  layer.width_out = width_out;
+  layer.height_out = height_out;
   int output_data_pixels = width_out * height_out * layer.channels_out;
   int num_weights =  // conv + bias weights
       layer.channels_out * layer.channels_in * layer.kernel * layer.kernel +

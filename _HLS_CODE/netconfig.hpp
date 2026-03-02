@@ -50,6 +50,7 @@ typedef ap_uint<NBITS(MAX_NUM_LAYERS - 1)> layerid_t;  // counts to num_layers-1
 typedef ap_uint<23> memaddr_t;  // must remain <= 23 bits to fit into float
 typedef ap_uint<2> kernel_t;    // =1 or =3
 typedef ap_uint<2> stride_t;    // =1 or =2
+typedef ap_uint<NBITS(MAX_PAD_SIZE)> padsize_t;    // =1 or =2
 typedef ap_uint<4> numfilterelems_t;  // either =1 or =9
 typedef float data_t;
 
@@ -62,10 +63,13 @@ struct layer_t {
   dimension_t width;  // input dimensions
   dimension_t height;
   channel_t channels_in;
+  dimension_t width_out;  // output dimensions
+  dimension_t height_out;
   channel_t channels_out;
   kernel_t kernel;  // kernel sizes supported: 3 or 1
   stride_t stride;  // only stride 1 or 2 supported
   bool pad;         // padding is either 0 or 1 pixel
+  padsize_t pad_size;
   bool relu;
   bool is_first_split_layer;
   bool is_second_split_layer;
@@ -83,6 +87,7 @@ struct layer_t {
         channels_out(co),
         kernel(k),
         pad(p),
+        pad_size(p),
         stride(s),
         relu(r),
         mem_addr_input(mem_i),
@@ -105,6 +110,7 @@ struct layer_t {
         channels_out(0),
         kernel(0),
         pad(0),
+        pad_size(0),
         stride(0),
         relu(0),
         mem_addr_input(0),
