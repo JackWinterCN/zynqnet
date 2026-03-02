@@ -30,9 +30,13 @@ void addLayer(network_t *net, layer_t layer) {
   //     Use for (expand3x3) and other "output-channel split" layers.
 
   // Keep Track of Memory Locations for Activations + Weights (-> static)
-  static int current_output_addr = 0;
-  static int current_input_addr = 0;
-  static int current_weights_addr = 0;
+  // Note: remote static property, and then only support 1 layer at a time
+  // static int current_output_addr = 0;
+  // static int current_input_addr = 0;
+  // static int current_weights_addr = 0;
+  int current_output_addr = 0;
+  int current_input_addr = 0;
+  int current_weights_addr = 0;
 
   // Align to memory borders (float needed because of ceil() operation below)
   float mem_border = MEMORY_ALIGNMENT / sizeof(data_t);

@@ -11,18 +11,24 @@
 
 // Size Limits for this Network
 const int MAX_NUM_LAYERS = 27;
-const int MAX_WEIGHTS_PER_LAYER = 387184;
-const int MAX_IMAGE_CACHE_SIZE = 32768;
-const int MAX_INPUT_PER_LAYER = 1048576;
+
+// const int MAX_WEIGHTS_PER_LAYER = 387184;
+const int MAX_WEIGHTS_PER_LAYER = 1179648;
+// const int MAX_IMAGE_CACHE_SIZE = 32768;
+const int MAX_IMAGE_CACHE_SIZE = 163840;
+// const int MAX_INPUT_PER_LAYER = 1048576;
+const int MAX_INPUT_PER_LAYER = 13107200;
 const int MAX_NUM_CHOUT = 512;
-const int MAX_DIMENSION = 256;
-const int MAX_CHANNELS = 736;
+// const int MAX_DIMENSION = 256;
+const int MAX_DIMENSION = 320;
+// const int MAX_CHANNELS = 736;
+const int MAX_CHANNELS = 1024;
 const int MAX_PAD_SIZE = 2;
 
-const int TOTAL_NUM_WEIGHTS = 2528800;
-const int TOTAL_NUM_INPUTS = 3661824;
-const int TOTAL_NUM_OUTPUTS = 3239936;
-const int TOTAL_DRAM_IO = 9430560;
+// const int TOTAL_NUM_WEIGHTS = 2528800;
+// const int TOTAL_NUM_INPUTS = 3661824;
+// const int TOTAL_NUM_OUTPUTS = 3239936;
+// const int TOTAL_DRAM_IO = 9430560;
 
 const int DRAM_DEPTH = 1440;
 const float TEST_RESULT_EXPECTED = 88.38;
