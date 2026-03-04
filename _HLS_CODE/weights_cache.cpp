@@ -78,7 +78,7 @@ void WeightsCache::loadFromDRAM(data_t *SHARED_DRAM) {
   // Load Filter Coefficients
   if (LOG_DETAILS)
     LOG("WeightsCache: loading %d weights...\n", (int)num_weights);
-  assert(num_weights <= MAX_WEIGHTS_PER_LAYER && "Loading too many Weights!");
+  assert(num_weights <= MAX_WEIGHTS_BIAS_PER_LAYER && "Loading too many Weights!");
 
   weightaddr_t dram_addr = 0;
 // Weights:

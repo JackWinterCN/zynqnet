@@ -254,9 +254,9 @@ L_LAYERS:
     // Calculate Memory Pointers
     LOG("SHARED_DRAM is at address: %lu\n", (long)SHARED_DRAM);
     int weights_offset =
-        ((long)SHARED_DRAM_WEIGHTS - (long)SHARED_DRAM) / sizeof(data_t);
+        ((long long)SHARED_DRAM_WEIGHTS - (long long)SHARED_DRAM) / sizeof(data_t);
     int input_offset =
-        ((long)SHARED_DRAM_DATA - (long)SHARED_DRAM) / sizeof(data_t);
+        ((long long)SHARED_DRAM_DATA - (long long)SHARED_DRAM) / sizeof(data_t);
     numfilterelems_t weights_per_filter = (layer.kernel == 3) ? 9 : 1;
     weightaddr_t num_weights =
         layer.channels_in * layer.channels_out * weights_per_filter;
@@ -400,8 +400,8 @@ void allocate_FPGA_memory(network_t *net_CPU) {
   printf("CPU: FPGA DRAM Memory Allocation:\n");
   printf("     Bytes allocated: %dB (config) + %dKB (weights) + %dKB (data)\n",
          0, weightsize / 1024, datasize / 1024);
-  printf("     region: %lu - %lu\n", (long)SHARED_DRAM,
-         (long)(SHARED_DRAM + total_size));
+  printf("     region: %llu - %llu\n", (long long)SHARED_DRAM,
+         (long long)(SHARED_DRAM + total_size));
 
   if (DRAM_DEPTH != total_size / sizeof(data_t)) {
     printf("\n\n!! ERROR !!\n");

@@ -44,7 +44,7 @@ const int MEMORY_ALIGNMENT = 4 * 1024;  // align data in DRAM to 4KB borders
 // ! need to include network.hpp first!
 typedef ap_uint<NBITS(MAX_DIMENSION)> dimension_t;
 typedef ap_uint<NBITS(MAX_CHANNELS + 9)> channel_t;
-typedef ap_uint<NBITS(MAX_WEIGHTS_PER_LAYER)> weightaddr_t;
+typedef ap_uint<NBITS(MAX_WEIGHTS_BIAS_PER_LAYER)> weightaddr_t;
 typedef ap_uint<NBITS(MAX_NUM_LAYERS)> numlayers_t;    // saves number of layers
 typedef ap_uint<NBITS(MAX_NUM_LAYERS - 1)> layerid_t;  // counts to num_layers-1
 typedef ap_uint<23> memaddr_t;  // must remain <= 23 bits to fit into float

@@ -22,10 +22,10 @@
 #define CEIL_DIV(x, y) (((x) + (y)-1) / (y))
 
 // Depth of single BRAM36 in (1K x 32b) configuration
-const int BLOCK_SIZE = 1024;
+const int BLOCK_SIZE = 512;
 // Number of BRAM36 needed per PE
 const int NUM_BRAMS_PER_PE =
-    (CEIL_DIV(((MAX_WEIGHTS_PER_LAYER) / 8), BLOCK_SIZE) / N_PE);
+    CEIL_DIV(CEIL_DIV(((MAX_WEIGHTS_BIAS_PER_LAYER) / 8), BLOCK_SIZE), N_PE);
 
 // Type Definitions needed
 typedef ap_uint<NBITS(N_PE)> PEID_t;

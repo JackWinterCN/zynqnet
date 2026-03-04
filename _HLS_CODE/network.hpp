@@ -12,10 +12,10 @@
 // Size Limits for this Network
 const int MAX_NUM_LAYERS = 27;
 
-// const int MAX_WEIGHTS_PER_LAYER = 387184;
-const int MAX_WEIGHTS_PER_LAYER = 1179648;
+// const int MAX_WEIGHTS_BIAS_PER_LAYER = 387184;
+const int MAX_WEIGHTS_BIAS_PER_LAYER = 36928;
 // const int MAX_IMAGE_CACHE_SIZE = 32768;
-const int MAX_IMAGE_CACHE_SIZE = 163840;
+const int MAX_IMAGE_CACHE_SIZE = 81920;
 // const int MAX_INPUT_PER_LAYER = 1048576;
 const int MAX_INPUT_PER_LAYER = 13107200;
 const int MAX_NUM_CHOUT = 512;
