@@ -27,6 +27,7 @@ void fpga_top(layer_t layer, data_t *SHARED_DRAM, unsigned int weights_offset,
               weightaddr_t num_weights, unsigned int input_offset) {
 #pragma HLS INTERFACE m_axi depth = DRAM_DEPTH port = SHARED_DRAM offset = \
     slave bundle = memorybus register
+#pragma HLS RESOURCE variable=SHARED_DRAM core=AXI4_MASTER
 #pragma HLS INTERFACE s_axilite port = layer bundle = axilite  register
 #pragma HLS INTERFACE s_axilite port = num_weights bundle = axilite  register
 #pragma HLS INTERFACE s_axilite port = weights_offset bundle = axilite  register
