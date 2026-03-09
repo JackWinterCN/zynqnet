@@ -121,6 +121,7 @@ struct layer_t {
         global_pool(0) {
     name[0] = 0;
   };
+  ~layer_t() {};
 };
 
 // ====================
