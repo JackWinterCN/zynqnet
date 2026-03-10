@@ -9,6 +9,17 @@
 //   (c) David Gschwend, 2016
 //
 //------------------------------------------------------------------------------
+#include <unistd.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <err.h>
+#include <errno.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "xpu_core_wrapper.hpp"
 #include "xparameters.h"
@@ -264,17 +275,41 @@ L_LAYERS:
       // XFPGA_setInputOffset(input_offset);
       XFpga_top_Set_input_offset(&g_fpga_top, input_offset);
 
+      {
+        int peek_size_byte = 5696;
+        volatile uint32_t *mem_phy = XFPGA_shared_DRAM_physical();
+        uint64_t mem_phy_64b = (uint64_t)mem_phy;
+        auto weight_mem_fd = open("/dev/mem", O_RDWR);
+        volatile float* weight_mem_phy = (float*)mmap(NULL, peek_size_byte, PROT_READ,
+                            MAP_SHARED, weight_mem_fd, mem_phy_64b);
+        for (int i = 0; i < peek_size_byte / sizeof(float); i++) {
+          printf("%10f", weight_mem_phy[i]);
+          if (i != 0 && i % 16 == 0) {
+            printf("\n");
+          }
+        }
+        int retval = munmap((void*)weight_mem_phy, peek_size_byte);
+        if (retval < 0) printf("[error]could not unmap memory region for axilite bus\n");
+        
+        // release file handle
+        retval = close(weight_mem_fd);
+        if (retval < 0) printf("[error]could not release /dev/mem file handle\n");
+      }
       // XFPGA_setLayerConfig(layer);
       union XPUCoreParamUnion param_temp;
       param_temp.layer_c = layer;
       XFpga_top_Set_layer(&g_fpga_top, param_temp.layer_pack);
       // XFPGA_Start();
+      printf("XFPGA Status before: Done = %d, Idle = %d, Ready = %d\n", XFpga_top_IsDone(&g_fpga_top),
+          XFpga_top_IsIdle(&g_fpga_top), XFpga_top_IsReady(&g_fpga_top));
       XFpga_top_Start(&g_fpga_top);
       while (!XFpga_top_IsDone(&g_fpga_top)) { // busy-wait
-        // sleep(1);            // sleep 100us
-        if (!BE_QUIET)
-          LOG("XFPGA Status: Done = %d, Idle = %d, Ready = %d\n", XFpga_top_IsDone(&g_fpga_top),
-          XFpga_top_IsIdle(&g_fpga_top), XFpga_top_IsReady(&g_fpga_top));
+        // sleep 100us
+        usleep(100);
+        if (!BE_QUIET) {
+          printf("XFPGA Status: Done = %d, Idle = %d, Ready = %d\n", XFpga_top_IsDone(&g_fpga_top), 
+            XFpga_top_IsIdle(&g_fpga_top), XFpga_top_IsReady(&g_fpga_top));
+        }
       }
     } else {  
       // CPU Simulation
@@ -285,7 +320,35 @@ L_LAYERS:
       fpga_top(layer, (data_t *)SHARED_DRAM, weights_offset, num_weights,
                input_offset);
     }
+    if (USE_FPGA_BLOCK) {
+      printf("XFPGA Status after: Done = %d, Idle = %d, Ready = %d\n", XFpga_top_IsDone(&g_fpga_top), 
+              XFpga_top_IsIdle(&g_fpga_top), XFpga_top_IsReady(&g_fpga_top));
 
+
+      {
+        int peek_size_byte = 5696;
+        volatile uint32_t *mem_phy = XFPGA_shared_DRAM_physical();
+        uint64_t mem_phy_64b = (uint64_t)mem_phy;
+        auto weight_mem_fd = open("/dev/mem", O_RDWR);
+        volatile float* weight_mem_phy = (float*)mmap(NULL, peek_size_byte, PROT_READ,
+                            MAP_SHARED, weight_mem_fd, mem_phy_64b);
+        for (int i = 0; i < peek_size_byte / sizeof(float); i++) {
+          printf("%10f", weight_mem_phy[i]);
+          if (i != 0 && i % 16 == 0) {
+            printf("\n");
+          }
+        }
+        int retval = munmap((void*)weight_mem_phy, peek_size_byte);
+        if (retval < 0) printf("[error]could not unmap memory region for axilite bus\n");
+        
+        // release file handle
+        retval = close(weight_mem_fd);
+        if (retval < 0) printf("[error]could not release /dev/mem file handle\n");
+      }
+
+
+
+    }
     if (!BE_QUIET) {
       gettimeofday(&t_layer_end, NULL);
       t_layer_elapsed = (t_layer_end.tv_sec - t_layer_start.tv_sec) * 1000;
@@ -387,8 +450,7 @@ void allocate_DRAM_memory(network_t *net_CPU) {
   printf("CPU: FPGA DRAM Memory Allocation:\n");
   printf("     Bytes allocated: %dB (config) + %dB/%dKB (weights) + %dB/%dKB (data)\n",
          0, weightsize, weightsize / 1024, datasize, datasize / 1024);
-  printf("     region: %lu - %lu\n", (long)SHARED_DRAM,
-         (long)(SHARED_DRAM + total_size));
+  printf("     region: %p - %p\n", SHARED_DRAM, (SHARED_DRAM + total_size));
 
   // Check that DRAM_DEPTH constant is correct for VHLS Co-Simulation
   int num_mem_elements = total_size / sizeof(data_t);

@@ -30,7 +30,7 @@ typedef uint32_t uint32_t;
 //      -> 896MB = 896*1024*1024 = 0x3800'0000 bytes
 //      -> 96MB = 96*1024*1024 = 0x600'0000 bytes
 
-const off_t SHARED_DRAM_BASE_ADDR = 0x38000000; 
+extern off_t SHARED_DRAM_BASE_ADDR;
 const size_t SHARED_DRAM_MEM_SIZE = 0x06000000;
 extern int SHARED_DRAM_FD;
 extern volatile uint32_t* SHARED_DRAM_PTR;

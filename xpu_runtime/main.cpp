@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < weight.size(); i++) {
     // weight[i] = (i % 10) * 0.1;
     // weight[i] = i * 0.1;
-    weight[i] = 0.1;
+    weight[i] = 1;
   }
   std::vector<float> bias(params.outputCount, 0.0f);
   for (int i = 0; i < bias.size(); i++) {
