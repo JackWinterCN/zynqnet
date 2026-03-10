@@ -5,7 +5,7 @@ project(xpu_runtime)
 set(EXECUTABLE_NAME ${PROJECT_NAME}.out)
 
 set(CMAKE_CXX_STANDARD 11)
-# set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Debug)
 
 file(GLOB SRC ./*.cpp
     ../_HLS_CODE/fpga_top.cpp

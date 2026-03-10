@@ -24,7 +24,7 @@ volatile data_t *SHARED_DRAM_DATA;
 bool USE_FPGA_BLOCK = false;
 bool BE_QUIET = false;
 
-XFpga_top_Config XFpga_top_ConfigTable[XPAR_XFPGA_TOP_NUM_INSTANCES];
+// XFpga_top_Config XFpga_top_ConfigTable[XPAR_XFPGA_TOP_NUM_INSTANCES];
 XFpga_top g_fpga_top;
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -133,8 +133,6 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
                                 int inputH, int inputW,
                                 const XPUCoreConvParams &params,
                                 bool simulation_mode, bool quiet) {
-  LOG_LEVEL = 0;
-  int res = 0;
   // Parse Arguments:
   if (simulation_mode) {
     USE_FPGA_BLOCK = false;
@@ -146,6 +144,9 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
   if (quiet) {
       BE_QUIET = true;
   }
+
+  LOG_LEVEL = 0;
+  int res = 0;
 
    auto input_nhwc = nchw_to_nhwc(input, N, params.inputCount, inputH, inputW);
   // auto input_nhwc = input;
@@ -162,11 +163,7 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
   // ========================
   // = Setup Network on CPU =
   // ========================
-  // Generate + Load Network Config from network.hpp/network.cpp
-  // network_t *net_CPU = get_network_config();
-  // printf("\nCPU: Load Network Configuration\n");
-  // print_layers(net_CPU);
-  // printf("\n");
+
   network_t *net_CPU = new network_t(1, weight_iokk.size() + bias.size());
   // Layer Attributes: ( NAME   ,   W,   H,   CI,  CO, K, P, S, R, S1, S2, GP)
   addLayer(net_CPU, layer_t("cx    ", inputW, inputH, params.inputCount,
@@ -183,10 +180,10 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
     // calculate address within weight memory section
     int num_weights = chout * chin * kernel * kernel + chout;
     float *weights_addr = (net_CPU->weights + layer->mem_addr_weights);
-
     // read portion of input file
     // fread(weights_addr, sizeof(data_t), num_weights, filehandle);
-    memcpy(weights_addr, weight_iokk.data(), weight_iokk.size() * sizeof(float));
+    memcpy(weights_addr, weight_iokk.data(),
+           weight_iokk.size() * sizeof(float));
     memcpy(weights_addr + weight_iokk.size(), bias.data(),
            bias.size() * sizeof(float));
   }
@@ -194,11 +191,13 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
   // ==========================
   // = Setup FPGA Accelerator =
   // ==========================
-
   // Initialize AXILITE Configuration Bus + Shared DRAM region
-  // if (USE_FPGA_BLOCK) {
-  //   XFPGA_Initialize();
-  // }
+  if (USE_FPGA_BLOCK) {
+    if(res = XFpga_top_Initialize(&g_fpga_top, "xpu_core")) {
+      printf("[error] XFpga_top_Initialize Failed with error code %d\n", res);
+      return std::vector<float>();
+    }
+  }
   // Allocate Shared Memory in DRAM for Weights + Data.
   allocate_DRAM_memory(net_CPU);
 
@@ -211,30 +210,6 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
   // Copy Layer Weights to DRAM.
   copy_weights_to_DRAM(net_CPU);
 
-  if (USE_FPGA_BLOCK) {
-    // Set Memory Configuration in FPGA
-    XFpga_top_ConfigTable[0].DeviceId = XPAR_XFPGA_TOP_0_DEVICE_ID;
-    XFpga_top_ConfigTable[0].Axilite_BaseAddress = XPAR_FPGA_TOP_0_S_AXI_AXILITE_BASEADDR;
-    XFpga_top_ConfigTable[0].Control_BaseAddress = XPAR_FPGA_TOP_0_S_AXI_CONTROL_BASEADDR;
-    if(res = XFpga_top_Initialize(&g_fpga_top, XPAR_XFPGA_TOP_0_DEVICE_ID)) {
-      printf("XFpga_top_Initialize Failed with error code %d\n", res);
-      return std::vector<float>();
-    }
-    // XFPGA_setDRAMBase(); // physical address!
-    uint64_t SHARED_DRAM_64b = (uint64_t)SHARED_DRAM;
-    // make sure DRAM address really fits into 32bits (no clipping)
-    // assert(SHARED_DRAM_64b - (u32)SHARED_DRAM_64b == 0);
-    // set DRAM address via AXILITE BUS
-    // XFPGA_Set_SHARED_DRAM((u32)SHARED_DRAM_64b);
-    XFpga_top_Set_SHARED_DRAM(&g_fpga_top, 0x40000000);
-
-    // XFPGA_setWeightsOffset(weights_offset);
-    XFpga_top_Set_weights_offset(&g_fpga_top, weights_offset);
-
-    // XFPGA_setInputOffset(input_offset);
-    XFpga_top_Set_input_offset(&g_fpga_top, input_offset);
-  }
-
   // ===========================
   // = Load + Copy Input Image =
   // ===========================
@@ -242,17 +217,14 @@ std::vector<float> xpu_core_run(const std::vector<float> &input,
   // Allocate Memory for Input Image:
   data_t *input_image = allocate_image_memory(input_layer);
   // Load Input Image
-  // load_prepared_input_image(input_layer, input_image, input_filename);
   memcpy(input_image, input_nhwc.data(), input_nhwc.size() * sizeof(float));
 
   // Copy Input Image into shared DRAM
   copy_input_image_to_DRAM(input_layer, input_image);
 
-
   // Per-Layer Performance Timing
   timeval t_layer_start, t_layer_end;
   double t_layer_elapsed;
-
   // ===========================
   // = Loop through CNN Layers =
   // ===========================
@@ -276,9 +248,22 @@ L_LAYERS:
     // ============================
     // = Execute FPGA Accelerator =
     // ============================
-
     if (USE_FPGA_BLOCK) {
-      // FPGA Accelerator Block
+      volatile uint32_t *SHARED_DRAM = XFPGA_shared_DRAM_physical();
+      uint64_t SHARED_DRAM_64b = (uint64_t)SHARED_DRAM;
+      // make sure DRAM address really fits into 32bits (no clipping)
+      assert(SHARED_DRAM_64b - (uint32_t)SHARED_DRAM_64b == 0);
+      // set DRAM address via AXILITE BUS
+      XFpga_top_Set_SHARED_DRAM(&g_fpga_top, SHARED_DRAM_64b); // physical
+      // XFPGA_setWeightsOffset(weights_offset);
+      XFpga_top_Set_weights_offset(&g_fpga_top, weights_offset);
+      uint32_t weights_per_filter = (layer.kernel == 3) ? 9 : 1;
+      uint32_t num_weights =
+          layer.channels_in * layer.channels_out * weights_per_filter;
+      XFpga_top_Set_num_weights(&g_fpga_top, num_weights);
+      // XFPGA_setInputOffset(input_offset);
+      XFpga_top_Set_input_offset(&g_fpga_top, input_offset);
+
       // XFPGA_setLayerConfig(layer);
       union XPUCoreParamUnion param_temp;
       param_temp.layer_c = layer;
@@ -309,7 +294,6 @@ L_LAYERS:
       fflush(stdout);
       LOG_LEVEL_DECR;
     }
-
   }  // layer loop
   LOG_LEVEL = 0;
 
@@ -318,25 +302,12 @@ L_LAYERS:
   // ======================================
   // Verify that last layer reduces spatial dimensions to 1x1:
   layer_t *final = &net_CPU->layers[net_CPU->num_layers - 1];
-  // assert(final->global_pool == true);
-
-  // Get Number of Output Layers (double if output is a split layer)
-  // int ch_out = (final->is_second_split_layer ? 2 : 1) * final->channels_out;
-
-  // Fetch Results from FPGA
-  // data_t *results = (data_t *)malloc(ch_out * sizeof(data_t));
-  // copy_results_from_DRAM(results, ch_out);
  int outputH =
       (inputH + 2 * params.padY - params.kernelY) / params.strideY + 1;
   int outputW =
       (inputW + 2 * params.padX - params.kernelX) / params.strideX + 1;
-
   int output_size = outputH * outputW * params.outputCount;
-
   std::vector<float> output_nhwc(output_size, 0);
-
-  // int input_offset =
-  //     ((long)SHARED_DRAM_DATA - (long)SHARED_DRAM) / sizeof(data_t);
   // Copy Result Data:
   memcpy(output_nhwc.data(), (data_t *)SHARED_DRAM_DATA + final->mem_addr_output,
          output_size * sizeof(float));
@@ -352,47 +323,15 @@ L_LAYERS:
   // =====================
   // = Release FPGA core =
   // =====================
-  // if (USE_FPGA_BLOCK) {
-  //   XFPGA_Release();
-  // }
+  if (USE_FPGA_BLOCK) {
+    XFpga_top_Release(&g_fpga_top);
+  }
 
   auto output_nchw =
       nhwc_to_nchw(output_nhwc, N, params.outputCount, outputH, outputW);
 
   return output_nchw;
-  // =====================
-  // = Calculate Softmax =
-  // =====================
-  // std::vector<std::pair<data_t, int> > probabilities(ch_out);
-  // calculate_softmax(net_CPU, results, probabilities);
-
-  // ==================
-  // = Report Results =
-  // ==================
-  // printf("\nResult (top-5):\n====================\n");
-  // for (int i = 0; i < std::min(5, ch_out); i++) {
-  //   printf("    %5.2f%%: class %3d (output %6.2f)\n",
-  //          100 * probabilities[i].first, probabilities[i].second,
-  //          results[probabilities[i].second]);
-  // }
-
-  // ====================
-  // = TestBench Result =
-  // ====================
-  // Check if output is AS EXPECTED (+- 0.5%) (defined in network.hpp)
-  // if (fabs(100 * probabilities[0].first - TEST_RESULT_EXPECTED) < 0.1) {
-  //   printf("\nTestBench Result: SUCCESS\n");
-  //   return 0;
-  // } else {
-  //   printf("\nTestBench Result: FAILURE\n");
-  //   printf("Actual: %5.2f, Expected: %5.2f\n", 100 * probabilities[0].first,
-  //          TEST_RESULT_EXPECTED);
-  //   return -1;
-  // }
 }
-
-/////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////
 
 // =======================================
 // = Allocate CPU Memory for Input Image =
@@ -434,8 +373,8 @@ void allocate_DRAM_memory(network_t *net_CPU) {
   // Memory Allocation
   if (USE_FPGA_BLOCK) {
     // Get Pointer to SHARED DRAM from XFPGA wrapper
-    // SHARED_DRAM = (volatile char *)XFPGA_shared_DRAM_virtual();
-    SHARED_DRAM = (volatile char *)malloc(total_size);
+    SHARED_DRAM = (volatile char *)XFPGA_shared_DRAM_virtual();
+    // SHARED_DRAM = (volatile char *)malloc(total_size);
   } else {
     // Allocate SHARED DRAM on Heap
     SHARED_DRAM = (volatile char *)malloc(total_size);
@@ -446,8 +385,8 @@ void allocate_DRAM_memory(network_t *net_CPU) {
 
   // Debug: Infos about Memory Regions
   printf("CPU: FPGA DRAM Memory Allocation:\n");
-  printf("     Bytes allocated: %dB (config) + %dKB (weights) + %dKB (data)\n",
-         0, weightsize / 1024, datasize / 1024);
+  printf("     Bytes allocated: %dB (config) + %dB/%dKB (weights) + %dB/%dKB (data)\n",
+         0, weightsize, weightsize / 1024, datasize, datasize / 1024);
   printf("     region: %lu - %lu\n", (long)SHARED_DRAM,
          (long)(SHARED_DRAM + total_size));
 
@@ -466,34 +405,10 @@ void allocate_DRAM_memory(network_t *net_CPU) {
 void copy_weights_to_DRAM(network_t *net_CPU) {
   int weightsize = net_CPU->num_weights * sizeof(data_t);
   // Info:
-  printf("CPU: Copy Weights: %dKB (weights) to FPGA DRAM\n", weightsize / 1024);
+  printf("CPU: Copy Weights: %dB/%dKB (weights) to FPGA DRAM\n", weightsize,
+         weightsize / 1024);
   // Copy Weights:
   memcpy((void *)SHARED_DRAM_WEIGHTS, net_CPU->weights, weightsize);
-}
-
-// ======================================
-// = Load Input Data from prepared File =
-// ======================================
-// Loads input_image with data from given file
-// (prepared input file using convert_image.py)
-void load_prepared_input_image(layer_t &layer, data_t *img_memory,
-                               const char *filename) {
-  // calculate size of input data
-  int win = layer.width;
-  int hin = layer.height;
-  int chin = layer.channels_in;
-  int num_pixels = win * hin * chin;
-  int input_size_kB = num_pixels * sizeof(data_t) / 1024;
-  printf("CPU: Load Input Data from file %s (%dKB)\n", filename, input_size_kB);
-
-  // load binary data from file
-  FILE *infile = fopen(filename, "rb");
-  if (!infile) {
-    printf("ERROR: Input Image %s could not be opened!\n", filename);
-    exit(-1);
-  }
-  fread(img_memory, sizeof(data_t), num_pixels, infile);
-  fclose(infile);
 }
 
 // ==========================================
@@ -506,7 +421,7 @@ void copy_input_image_to_DRAM(layer_t &layer, data_t *image) {
   int chin = layer.channels_in;
   int num_pixels = win * hin * chin;
   int input_size = num_pixels * sizeof(data_t);
-  printf("CPU: Copy Input Image (%dKB)\n", input_size / 1024);
+  printf("CPU: Copy Input Image (%dB)/(%dKB)\n", input_size, input_size / 1024);
 
   // Copy Input Data:
   memcpy((void *)SHARED_DRAM_DATA, image, input_size);
@@ -527,138 +442,3 @@ void copy_results_from_DRAM(data_t *results, int ch_out) {
   // Copy Result Data:
   memcpy(results, (void *)(SHARED_DRAM_DATA + result_offset), result_size);
 }
-
-// ===========================================
-// = Calculate Softmax from Raw FPGA Results =
-// ===========================================
-void calculate_softmax(network_t *net_CPU, data_t *results,
-                       std::vector<std::pair<data_t, int> > &probabilities) {
-  // First, finish Global AVG Pooling (FPGA does just accumulation, no division)
-  // Then, subtract maximum to avoid Numerical Issues in Exponentiation
-  // (as done by CAFFE in caffe/include/caffe/layers/softmax_layer.hpp)
-  // Then, calculate actual Softmax [ p_i = e^{r_i} / (\sum(e^{r_i})) ]
-
-  // Divide by WxH of Output Maps:
-  layer_t *final = &net_CPU->layers[net_CPU->num_layers - 1];
-  data_t num_output_pixels = final->width * final->height;
-  if (final->stride == 2) num_output_pixels /= 4;
-  int ch_out = final->channels_out;
-  if (final->is_second_split_layer) ch_out *= 2;
-
-  data_t maxresult = 0;
-  for (int i = 0; i < ch_out; i++) {
-    // Average over spatial output dimensions
-    results[i] /= num_output_pixels;
-    // Find maximum result
-    maxresult = std::max(maxresult, results[i]);
-    DBG("  %6.2f\n", results[i]);
-  }
-  DBG("(maximum: %6.2f)\n", maxresult);
-
-  // Calculate Exponentials and Sum
-  data_t expsum = 0;
-  std::vector<data_t> exponentials(ch_out);
-  for (int i = 0; i < ch_out; i++) {
-    // Subtract Maximum ("normalize"), then calculate e^()
-    exponentials[i] = exp(results[i] - maxresult);
-    // Accumulate Sum of Exponentials
-    expsum += exponentials[i];
-  }
-  DBG("sum of exponentials: %f\n", expsum);
-
-  // Calculate Softmax Probabilities [ p_i = e^{r_i} / (\sum(e^{r_i})) ]
-  for (int i = 0; i < ch_out; i++) {
-    probabilities[i] = std::pair<data_t, int>(exponentials[i] / expsum, i);
-    // printf("P(class %3d) = %4.2f%%\n", i, 100 * probabilities[i].first);
-  }
-
-  // Sort (small index = high probability)
-  std::sort(probabilities.begin(), probabilities.end());
-  std::reverse(probabilities.begin(), probabilities.end());
-}
-
-/*
-// =========================================
-// = Debug: Generate Structured Input Data =
-// =========================================
-// Fills input_image with pixels of format YYYXXX.0CH (for debugging)
-void generate_structured_input_image(data_t *input_image, int win, int hin,
-                                     int chin) {
-  // STRUCTURED INPUT
-  for (int x = 0; x < win; x++) {
-    for (int y = 0; y < hin; y++) {
-      for (int ch = 0; ch < chin; ch++) {
-        data_t value = y * 1000.0 + x + ch / 1000.0;
-        input_image[y * win * chin + x * chin + ch] = value;
-      }
-    }
-  }
-}
-
-// =====================================
-// = Debug: Generate Random Input Data =
-// =====================================
-// Fills input_image with random data_ts between -100 and +100 (for testing)
-// Set seed=-1 to shuffle the random generator
-void generate_random_input_image(data_t *input_image, int win, int hin,
-                                 int chin, int seed = 1) {
-  // Expected Results:
-  // For seed = 1 [default] and miniFire8UnitFilter, should get result 14154.350
-  // for each class.
-
-  // Enable for real randomness: (time() updates every second)
-  if (seed == -1) {
-    srand(time(NULL));
-  } else {
-    srand(seed);
-  }
-
-  // RANDOM INPUT
-  // Generate Input Image (pixels between +-1, 3 places after zero)
-  for (int x = 0; x < win; x++) {
-    for (int y = 0; y < hin; y++) {
-      for (int ch = 0; ch < chin; ch++) {
-        //
-        data_t value = (rand() % 2000 - 1000) / 2000.0 * 100;
-        input_image[y * win * chin + x * chin + ch] = value;
-      }
-    }
-  }
-}
-
-// ===========================================
-// = TODO: Load Input Data from JPG/PNG File =
-// ===========================================
-// NOT IMPLEMENTED (YET)
-void load_image_file(data_t *input_image, const char *filename, int win,
-                     int hin, int chin) {
-  // TODO: Implement Image Loading from PNG, JPG
-  // (maybe not necessary -> binary data from camera?)
-}
-// ===================================
-// = Preprocess: Subtract Mean Pixel =
-// ===================================
-// not necessary for prepared input image
-void do_preprocess(data_t *input_image, int win, int hin, int chin) {
-  for (int y = 0; y < hin; y++) {
-    for (int x = 0; x < win; x++) {
-      // Subtract Mean Pixel (defined in network.hpp)
-      input_image[y * win * chin + x * chin + 0] -= MEAN_R;
-      input_image[y * win * chin + x * chin + 1] -= MEAN_G;
-      input_image[y * win * chin + x * chin + 2] -= MEAN_B;
-    }
-  }
-}
-*/
-
-// ===========
-// = LOGGING =
-// ===========
-// bool LOG_DETAILS = false;
-// int LOG_LEVEL = 0;
-// void print_indent(int lvl) {
-//   while (lvl--) {
-//     putchar(' ');
-//     putchar(' ');
-//   }
-// }
